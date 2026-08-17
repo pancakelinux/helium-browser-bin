@@ -11,6 +11,6 @@ jobs:
     steps:
       - name: Sync fork with upstream
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.TOKEN }} # github token doesnt want to work :/
         run: |
           gh repo sync ItzPancakse/helium-browser-bin --source s6muel/helium-browser-bin
