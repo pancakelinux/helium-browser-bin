@@ -1,0 +1,70 @@
+name: Build & Publish helium-browser-bin
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'   # weekly, Monday 6am UTC
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged
+    steps:
+      - name: Install build tools
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm base-devel git openssh rsync
+
+      - name: Create unprivileged build user
+        run: |
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - name: Import Helium's GPG signing key
+        run: |
+          su builder -c "
+            curl -sL https://raw.githubusercontent.com/imputnet/helium-linux/main/pubkey.asc -o /tmp/helium_pub.asc &&
+            gpg --import /tmp/helium_pub.asc
+          "
+
+      - name: Clone your fork
+        run: |
+          su builder -c "
+            cd /home/builder &&
+            git clone https://github.com/ItzPancakse/helium-browser-bin.git
+          "
+
+      - name: Build package
+        run: |
+          su builder -c "
+            cd /home/builder/helium-browser-bin &&
+            makepkg -s --noconfirm
+          "
+
+      - name: Add to repo database
+        run: |
+          su builder -c "
+            cd /home/builder/helium-browser-bin &&
+            repo-add pancakelinuxrepo.db.tar.gz *.pkg.tar.zst
+          "
+
+      - name: Deploy to panstore
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.REPO_SERVER_SSH_KEY }}
+          SSH_HOST: ${{ secrets.REPO_SERVER_HOST }}
+          SSH_USER: ${{ secrets.REPO_SERVER_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+          rsync -avz --no-perms \
+            /home/builder/helium-browser-bin/*.pkg.tar.zst \
+            /home/builder/helium-browser-bin/pancakelinuxrepo.db.tar.gz \
+            /home/builder/helium-browser-bin/pancakelinuxrepo.db \
+            /home/builder/helium-browser-bin/pancakelinuxrepo.files.tar.gz \
+            /home/builder/helium-browser-bin/pancakelinuxrepo.files \
+            "$SSH_USER@$SSH_HOST:/srv/myrepo/x86_64/"
