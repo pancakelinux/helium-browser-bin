@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Install build tools
         run: |
-          pacman -Syu --noconfirm
+          pacman -Syyu --noconfirm || pacman -Syyu --noconfirm
           pacman -S --noconfirm base-devel git openssh rsync curl
 
       - name: Create unprivileged build user
@@ -69,7 +69,7 @@ jobs:
             makepkg -s --noconfirm
           "
 
-      - name: Pull existing repo db 
+      - name: Pull existing repo db
         run: |
           echo "Using SSH config at: $HOME/.ssh/config"
           cat "$HOME/.ssh/config"
@@ -86,12 +86,13 @@ jobs:
             repo-add pancakelinuxrepo.db.tar.gz *.pkg.tar.zst
           "
 
-      - name: Deploy
+      - name: Deploy 
         run: |
           rsync -avz --no-perms -e "ssh -F $HOME/.ssh/config" \
             /home/builder/helium-browser-bin/*.pkg.tar.zst \
             /home/builder/helium-browser-bin/pancakelinuxrepo.db.tar.gz \
             /home/builder/helium-browser-bin/pancakelinuxrepo.db \
+            
             /home/builder/helium-browser-bin/pancakelinuxrepo.files.tar.gz \
             /home/builder/helium-browser-bin/pancakelinuxrepo.files \
             panstore:/srv/myrepo/x86_64/
