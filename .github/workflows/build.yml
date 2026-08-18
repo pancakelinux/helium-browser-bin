@@ -59,7 +59,7 @@ jobs:
         run: |
           su builder -c "
             cd /home/builder &&
-            git clone https://x-access-token:${REPO_CLONE_TOKEN}@github.com/ItzPancakse/helium-browser-bin.git
+            git clone https://x-access-token:${REPO_CLONE_TOKEN}@github.com/pancakelinux/helium-browser-bin.git
           "
 
       - name: Build package
