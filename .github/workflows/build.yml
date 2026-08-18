@@ -54,10 +54,12 @@ jobs:
           "
 
       - name: Clone your fork
+        env:
+          REPO_CLONE_TOKEN: ${{ secrets.REPO_CLONE_TOKEN }}
         run: |
           su builder -c "
             cd /home/builder &&
-            git clone https://github.com/pancakelinux/helium-browser-bin.git
+            git clone https://x-access-token:${REPO_CLONE_TOKEN}@github.com/ItzPancakse/helium-browser-bin.git
           "
 
       - name: Build package
@@ -67,9 +69,11 @@ jobs:
             makepkg -s --noconfirm
           "
 
-      - name: Pull existing repo db from pancake-linux repo
+      - name: Pull existing repo db 
         run: |
-          rsync -avz --ignore-missing-args -e "ssh -F /root/.ssh/config" \
+          echo "Using SSH config at: $HOME/.ssh/config"
+          cat "$HOME/.ssh/config"
+          rsync -avz --ignore-missing-args -e "ssh -F $HOME/.ssh/config" \
             panstore:/srv/myrepo/x86_64/pancakelinuxrepo.db.tar.gz \
             panstore:/srv/myrepo/x86_64/pancakelinuxrepo.files.tar.gz \
             /home/builder/helium-browser-bin/ || true
@@ -82,13 +86,12 @@ jobs:
             repo-add pancakelinuxrepo.db.tar.gz *.pkg.tar.zst
           "
 
-      - name: Deploy to pancake-linux repo
+      - name: Deploy
         run: |
-          rsync -avz --no-perms -e "ssh -F /root/.ssh/config" \
+          rsync -avz --no-perms -e "ssh -F $HOME/.ssh/config" \
             /home/builder/helium-browser-bin/*.pkg.tar.zst \
             /home/builder/helium-browser-bin/pancakelinuxrepo.db.tar.gz \
             /home/builder/helium-browser-bin/pancakelinuxrepo.db \
             /home/builder/helium-browser-bin/pancakelinuxrepo.files.tar.gz \
             /home/builder/helium-browser-bin/pancakelinuxrepo.files \
             panstore:/srv/myrepo/x86_64/
-            
