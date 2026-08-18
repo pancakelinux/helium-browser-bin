@@ -13,4 +13,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.TOKEN }} # github token doesnt want to work :/
         run: |
-          gh repo sync ItzPancakse/helium-browser-bin --source s6muel/helium-browser-bin
+          gh repo sync pancakelinux/helium-browser-bin --source s6muel/helium-browser-bin
