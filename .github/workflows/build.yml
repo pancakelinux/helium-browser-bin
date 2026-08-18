@@ -34,17 +34,19 @@ jobs:
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
+          echo "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
           cat >> ~/.ssh/config << EOF
           Host panstore
             HostName ssh.pancakse.dev
             User ${{ secrets.REPO_SERVER_USER }}
-            IdentityFile ~/.ssh/id_ed25519
+            IdentityFile $HOME/.ssh/id_ed25519
             ProxyCommand cloudflared access ssh --hostname %h --service-token-id $CF_ACCESS_CLIENT_ID --service-token-secret $CF_ACCESS_CLIENT_SECRET
             StrictHostKeyChecking no
           EOF
           chmod 600 ~/.ssh/config
+          echo "Key written to: $HOME/.ssh/id_ed25519"
+          ls -la "$HOME/.ssh/"
 
       - name: Import Helium's GPG signing key
         run: |
@@ -86,13 +88,12 @@ jobs:
             repo-add pancakelinuxrepo.db.tar.gz *.pkg.tar.zst
           "
 
-      - name: Deploy 
+      - name: Deploy
         run: |
           rsync -avz --no-perms -e "ssh -F $HOME/.ssh/config" \
             /home/builder/helium-browser-bin/*.pkg.tar.zst \
             /home/builder/helium-browser-bin/pancakelinuxrepo.db.tar.gz \
             /home/builder/helium-browser-bin/pancakelinuxrepo.db \
-            
             /home/builder/helium-browser-bin/pancakelinuxrepo.files.tar.gz \
             /home/builder/helium-browser-bin/pancakelinuxrepo.files \
             panstore:/srv/myrepo/x86_64/
