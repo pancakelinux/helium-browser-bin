@@ -1,5 +1,4 @@
 name: Build & Publish helium-browser-bin
-
 on:
   workflow_dispatch:
   schedule:
@@ -15,12 +14,37 @@ jobs:
       - name: Install build tools
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git openssh rsync
+          pacman -S --noconfirm base-devel git openssh rsync curl
 
       - name: Create unprivileged build user
         run: |
           useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - name: Install cloudflared client
+        run: |
+          curl -L -o /usr/local/bin/cloudflared \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x /usr/local/bin/cloudflared
+
+      - name: Set up SSH over Cloudflare Access
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.REPO_SERVER_SSH_KEY }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          cat >> ~/.ssh/config << EOF
+          Host panstore
+            HostName ssh.pancakse.dev
+            User ${{ secrets.REPO_SERVER_USER }}
+            IdentityFile ~/.ssh/id_ed25519
+            ProxyCommand cloudflared access ssh --hostname %h --service-token-id $CF_ACCESS_CLIENT_ID --service-token-secret $CF_ACCESS_CLIENT_SECRET
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Import Helium's GPG signing key
         run: |
@@ -43,6 +67,14 @@ jobs:
             makepkg -s --noconfirm
           "
 
+      - name: Pull existing repo db from pancake-linux repo
+        run: |
+          rsync -avz --ignore-missing-args -e "ssh -F /root/.ssh/config" \
+            panstore:/srv/myrepo/x86_64/pancakelinuxrepo.db.tar.gz \
+            panstore:/srv/myrepo/x86_64/pancakelinuxrepo.files.tar.gz \
+            /home/builder/helium-browser-bin/ || true
+          chown builder:builder /home/builder/helium-browser-bin/*.tar.gz 2>/dev/null || true
+
       - name: Add to repo database
         run: |
           su builder -c "
@@ -50,21 +82,13 @@ jobs:
             repo-add pancakelinuxrepo.db.tar.gz *.pkg.tar.zst
           "
 
-      - name: Deploy to panstore
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.REPO_SERVER_SSH_KEY }}
-          SSH_HOST: ${{ secrets.REPO_SERVER_HOST }}
-          SSH_USER: ${{ secrets.REPO_SERVER_USER }}
+      - name: Deploy to pancake-linux repo
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
-
-          rsync -avz --no-perms \
+          rsync -avz --no-perms -e "ssh -F /root/.ssh/config" \
             /home/builder/helium-browser-bin/*.pkg.tar.zst \
             /home/builder/helium-browser-bin/pancakelinuxrepo.db.tar.gz \
             /home/builder/helium-browser-bin/pancakelinuxrepo.db \
             /home/builder/helium-browser-bin/pancakelinuxrepo.files.tar.gz \
             /home/builder/helium-browser-bin/pancakelinuxrepo.files \
-            "$SSH_USER@$SSH_HOST:/srv/myrepo/x86_64/"
+            panstore:/srv/myrepo/x86_64/
+            
