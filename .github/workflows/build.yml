@@ -13,8 +13,8 @@ jobs:
     steps:
       - name: Install build tools
         run: |
-          pacman -Syyu --noconfirm || pacman -Syyu --noconfirm
-          pacman -S --noconfirm base-devel git openssh rsync curl
+          pacman -Sy --noconfirm
+          pacman -S --noconfirm --needed base-devel git openssh rsync curl
 
       - name: Create unprivileged build user
         run: |
@@ -97,3 +97,4 @@ jobs:
             /home/builder/helium-browser-bin/pancakelinuxrepo.files.tar.gz \
             /home/builder/helium-browser-bin/pancakelinuxrepo.files \
             panstore:/srv/myrepo/x86_64/
+            
